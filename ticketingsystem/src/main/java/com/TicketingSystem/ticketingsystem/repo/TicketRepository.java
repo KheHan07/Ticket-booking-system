@@ -8,5 +8,10 @@ import java.util.List;
 
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
+
+    // Find all unsold tickets
     List<Ticket> findByIsSoldFalse();
+
+    // Find all unsold tickets by event name
+    List<Ticket> findByEventNameAndIsSoldFalse(String eventName);
 }
