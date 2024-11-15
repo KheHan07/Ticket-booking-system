@@ -30,36 +30,36 @@ public class TicketController {
         return ticketService.getAvailableTickets();
     }
 
-    // Create a single ticket
-    @PostMapping("/createticket")
-    public TicketDTO createTicket(@RequestBody TicketDTO ticketDTO) {
-        return ticketService.createTicket(ticketDTO);
-    }
-
-    // Sell a ticket by ID
-    @PutMapping("/{id}/sell")
-    public TicketDTO sellTicket(@PathVariable Long id) {
-        return ticketService.sellTicket(id);
-    }
-
-    // Start the ticket production process (accepting ticket details)
-    @PostMapping("/startProduction")
-    public String startProduction(@RequestBody TicketRequest ticketRequest) {
-        // Call the service to produce the requested number of tickets
-        ticketService.startProducingTickets(
+    // Generate tickets for an event
+    @PostMapping("/generateTickets")
+    public String generateTickets(@RequestBody TicketRequest ticketRequest) {
+        ticketService.generateTickets(
                 ticketRequest.getNoOfTickets(),
                 ticketRequest.getEventName(),
-                ticketRequest.getPrice(),
-                ticketRequest.isSold()
+                ticketRequest.getPrice()
         );
-        return "Ticket production started for " + ticketRequest.getNoOfTickets() + " tickets.";
+        return ticketRequest.getNoOfTickets() + " tickets generated for event: " + ticketRequest.getEventName();
     }
 
-    // Start the ticket consumption process
-    @PostMapping("/startConsumption")
-    public String startConsumption() {
-        ticketConsumerService.startConsumingTickets();
-        return "Ticket consumption started.";
+    // Delete unsold tickets by event name
+// Delete all unsold tickets for a specific event
+    @DeleteMapping("/deleteEvent")
+    public String deleteEvent(@RequestParam String eventName) {
+        int deletedCount = ticketService.deleteUnsoldTicketsByEvent(eventName);
+        if (deletedCount > 0) {
+            return "All unsold tickets for event '" + eventName + "' have been deleted.";
+        } else {
+            return "No unsold tickets found for event '" + eventName + "'.";
+        }
+    }
+
+
+    // Buy tickets by event name and quantity
+    @PostMapping("/buyTickets")
+    public String buyTickets(@RequestParam String eventName, @RequestParam int quantity) {
+        boolean success = ticketService.buyTickets(eventName, quantity);
+        return success ? quantity + " tickets bought for event '" + eventName + "'."
+                : "Not enough available tickets for event '" + eventName + "'.";
     }
 
     // Get all sold tickets

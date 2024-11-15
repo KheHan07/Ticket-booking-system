@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class TicketService {
 
     @Autowired
-    private TicketRepository ticketRepository;  // Only this declaration is needed
+    private TicketRepository ticketRepository;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -27,6 +27,37 @@ public class TicketService {
         return availableTickets.stream()
                 .map(ticket -> modelMapper.map(ticket, TicketDTO.class))
                 .collect(Collectors.toList());
+    }
+
+    public void generateTickets(int noOfTickets, String eventName, double price) {
+        List<Ticket> tickets = new ArrayList<>();
+        for (int i = 0; i < noOfTickets; i++) {
+            Ticket ticket = new Ticket();
+            ticket.setEventName(eventName);
+            ticket.setPrice(price);
+            ticket.setSold(false);
+            tickets.add(ticket);
+        }
+        ticketRepository.saveAll(tickets);
+    }
+
+    public int deleteUnsoldTicketsByEvent(String eventName) {
+        List<Ticket> unsoldTickets = ticketRepository.findByEventNameAndIsSoldFalse(eventName);
+        int deletedCount = unsoldTickets.size();
+        ticketRepository.deleteAll(unsoldTickets);
+        return deletedCount;
+    }
+
+
+    public boolean buyTickets(String eventName, int quantity) {
+        List<Ticket> availableTickets = ticketRepository.findByEventNameAndIsSoldFalse(eventName);
+        if (availableTickets.size() < quantity) {
+            return false;  // Not enough tickets available
+        }
+        List<Ticket> ticketsToBuy = availableTickets.subList(0, quantity);
+        ticketsToBuy.forEach(ticket -> ticket.setSold(true));
+        ticketRepository.saveAll(ticketsToBuy);
+        return true;
     }
 
     public TicketDTO createTicket(TicketDTO ticketDTO) {
@@ -45,21 +76,5 @@ public class TicketService {
         ticket.setSold(true);
         ticket = ticketRepository.save(ticket);
         return modelMapper.map(ticket, TicketDTO.class);
-    }
-
-    // This method will create a batch of tickets
-    public void startProducingTickets(int noOfTickets, String eventName, double price, boolean isSold) {
-        List<Ticket> ticketsToCreate = new ArrayList<>();
-
-        for (int i = 0; i < noOfTickets; i++) {
-            Ticket ticket = new Ticket();
-            ticket.setEventName(eventName);
-            ticket.setPrice(price);
-            ticket.setSold(isSold);
-            ticketsToCreate.add(ticket);
-        }
-
-        // Save all the tickets in the repository
-        ticketRepository.saveAll(ticketsToCreate);
     }
 }
