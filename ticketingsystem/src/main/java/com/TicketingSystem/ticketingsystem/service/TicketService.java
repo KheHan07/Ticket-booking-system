@@ -1,80 +1,106 @@
 package com.TicketingSystem.ticketingsystem.service;
 
-import com.TicketingSystem.ticketingsystem.dto.TicketDTO;
-import com.TicketingSystem.ticketingsystem.entity.Ticket;
-import com.TicketingSystem.ticketingsystem.repo.TicketRepository;
-import org.modelmapper.ModelMapper;
+import com.TicketingSystem.ticketingsystem.dto.TicketConfigDto;
+import com.TicketingSystem.ticketingsystem.dto.StartStopDto;
+import com.TicketingSystem.ticketingsystem.controller.WebSocketController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
-@Transactional
 public class TicketService {
+    private ExecutorService executorService;
+    private boolean running = false;
+    private TicketPool ticketPool;
+    private Vendor[] vendors;
+    private Customer[] customers;
 
     @Autowired
-    private TicketRepository ticketRepository;
+    private WebSocketController webSocketController;
 
-    @Autowired
-    private ModelMapper modelMapper;
+    // Add fields for the configuration parameters
+    private int totalTickets;
+    private int ticketReleaseRate;
+    private int customerRetrievalRate;
 
-    public List<TicketDTO> getAvailableTickets() {
-        List<Ticket> availableTickets = ticketRepository.findByIsSoldFalse();
-        return availableTickets.stream()
-                .map(ticket -> modelMapper.map(ticket, TicketDTO.class))
-                .collect(Collectors.toList());
-    }
+    public void configure(TicketConfigDto configDto) {
+        // Set the configuration values
+        this.totalTickets = configDto.getTotalTickets();
+        this.ticketReleaseRate = configDto.getTicketReleaseRate();
+        this.customerRetrievalRate = configDto.getCustomerRetrievalRate();
+        this.ticketPool = new TicketPool(configDto.getMaxTicketCapacity(), webSocketController);
 
-    public void generateTickets(int noOfTickets, String eventName, double price) {
-        List<Ticket> tickets = new ArrayList<>();
-        for (int i = 0; i < noOfTickets; i++) {
-            Ticket ticket = new Ticket();
-            ticket.setEventName(eventName);
-            ticket.setPrice(price);
-            ticket.setSold(false);
-            tickets.add(ticket);
+        // Default number of vendors and customers
+        vendors = new Vendor[2];
+        customers = new Customer[3];
+
+        // Initialize vendors and customers
+        for (int i = 0; i < vendors.length; i++) {
+            vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / vendors.length, webSocketController);
         }
-        ticketRepository.saveAll(tickets);
-    }
-
-    public int deleteUnsoldTicketsByEvent(String eventName) {
-        List<Ticket> unsoldTickets = ticketRepository.findByEventNameAndIsSoldFalse(eventName);
-        int deletedCount = unsoldTickets.size();
-        ticketRepository.deleteAll(unsoldTickets);
-        return deletedCount;
-    }
-
-
-    public boolean buyTickets(String eventName, int quantity) {
-        List<Ticket> availableTickets = ticketRepository.findByEventNameAndIsSoldFalse(eventName);
-        if (availableTickets.size() < quantity) {
-            return false;  // Not enough tickets available
+        for (int i = 0; i < customers.length; i++) {
+            customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController);
         }
-        List<Ticket> ticketsToBuy = availableTickets.subList(0, quantity);
-        ticketsToBuy.forEach(ticket -> ticket.setSold(true));
-        ticketRepository.saveAll(ticketsToBuy);
-        return true;
+
+        System.out.println("Configuration completed with: " + configDto);
     }
 
-    public TicketDTO createTicket(TicketDTO ticketDTO) {
-        Ticket ticket = modelMapper.map(ticketDTO, Ticket.class);
-        ticket.setSold(false); // Ensures ticket is unsold upon creation
-        ticket = ticketRepository.save(ticket);
-        return modelMapper.map(ticket, TicketDTO.class);
-    }
-
-    public TicketDTO sellTicket(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket not found"));
-        if (ticket.isSold()) {
-            throw new RuntimeException("Ticket already sold");
+    public String startSystem(StartStopDto dto) {
+        if (running) {
+            return "System is already running";
         }
-        ticket.setSold(true);
-        ticket = ticketRepository.save(ticket);
-        return modelMapper.map(ticket, TicketDTO.class);
+        running = true;
+        executorService = Executors.newCachedThreadPool();
+
+        // Start vendors and customers
+        for (Vendor vendor : vendors) {
+            executorService.execute(vendor);
+        }
+        for (Customer customer : customers) {
+            executorService.execute(customer);
+        }
+
+        return "System started successfully";
+    }
+
+    public void stopSystem() {
+        if (!running) {
+            System.out.println("System is not running");
+            return;
+        }
+        running = false;
+        executorService.shutdown();
+
+        // Stop vendors and customers
+        for (Vendor vendor : vendors) {
+            vendor.stop();
+        }
+        for (Customer customer : customers) {
+            customer.stop();
+        }
+        System.out.println("Stopping the system");
+    }
+
+    public void setVendorsAndBuyers(StartStopDto dto) {
+        // Set the number of vendors and customers based on the new configuration
+        int numberOfVendors = dto.getNumberOfVendors();
+        int numberOfCustomers = dto.getNumberOfBuyers();
+
+        this.vendors = new Vendor[numberOfVendors];
+        this.customers = new Customer[numberOfCustomers];
+
+        // Initialize new vendors
+        for (int i = 0; i < numberOfVendors; i++) {
+            this.vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / numberOfVendors, webSocketController);
+        }
+
+        // Initialize new customers
+        for (int i = 0; i < numberOfCustomers; i++) {
+            this.customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController);
+        }
+
+        System.out.println("Number of vendors and buyers set successfully.");
     }
 }
