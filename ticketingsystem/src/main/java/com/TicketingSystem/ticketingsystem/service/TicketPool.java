@@ -2,11 +2,11 @@ package com.TicketingSystem.ticketingsystem.service;
 
 import com.TicketingSystem.ticketingsystem.controller.WebSocketController;
 
-import java.util.List;
-import java.util.Collections;
-import java.util.ArrayList;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class TicketPool {
     private final List<Integer> tickets;
@@ -31,11 +31,10 @@ public class TicketPool {
         for (int i = 0; i < count; i++) {
             tickets.add(i);
             logToFile("Ticket added: " + i);
+            // This will send simple message, stats are handled elsewhere
             webSocketController.sendTicketUpdate("Ticket added: " + i);
-            System.out.println("Ticket added: " + i);
         }
         webSocketController.sendTicketUpdate("Tickets available after addition: " + tickets.size());
-        System.out.println("Tickets available after addition: " + tickets.size());
         notifyAll();
     }
 
@@ -51,10 +50,8 @@ public class TicketPool {
         if (ticket != null) {
             logToFile("Ticket removed: " + ticket);
             webSocketController.sendTicketUpdate("Ticket removed: " + ticket);
-            System.out.println("Ticket removed: " + ticket);
         }
         webSocketController.sendTicketUpdate("Tickets available after removal: " + tickets.size());
-        System.out.println("Tickets available after removal: " + tickets.size());
         notifyAll();
         return ticket;
     }

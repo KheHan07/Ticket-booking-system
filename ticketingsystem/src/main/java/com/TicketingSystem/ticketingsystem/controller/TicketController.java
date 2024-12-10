@@ -18,12 +18,12 @@ public class TicketController {
         ticketService.configure(configDto);
         return "Configuration completed";
     }
+
     @PostMapping("/set-vendors-buyers")
     public String setVendorsAndBuyers(@RequestBody StartStopDto dto) {
         ticketService.setVendorsAndBuyers(dto);
         return "Vendors and buyers updated successfully.";
     }
-
 
     @PostMapping("/start")
     public String startTicketingSystem(@RequestBody StartStopDto dto) {
@@ -34,5 +34,11 @@ public class TicketController {
     public String stopTicketingSystem() {
         ticketService.stopSystem();
         return "System stopped";
+    }
+
+    @PostMapping("/reset")
+    public String resetTicketingSystem() {
+        ticketService.resetSystem();
+        return "System reset successfully";
     }
 }

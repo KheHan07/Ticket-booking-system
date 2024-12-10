@@ -8,21 +8,29 @@ public class Vendor implements Runnable {
     private int totalTickets;
     private volatile boolean running = true;
     private final WebSocketController webSocketController;
+    private final int vendorId;
+    private final TicketService ticketService; // Reference to update stats
 
-    public Vendor(TicketPool ticketPool, int releaseRate, int totalTickets, WebSocketController webSocketController) {
+    public Vendor(TicketPool ticketPool, int releaseRate, int totalTickets, WebSocketController webSocketController, int vendorId, TicketService ticketService) {
         this.ticketPool = ticketPool;
         this.releaseRate = releaseRate;
         this.totalTickets = totalTickets;
         this.webSocketController = webSocketController;
+        this.vendorId = vendorId;
+        this.ticketService = ticketService;
     }
-
 
     @Override
     public void run() {
         while (running && totalTickets > 0) {
-            ticketPool.addTickets(releaseRate);
-            totalTickets -= releaseRate;
-            webSocketController.sendTicketUpdate("Vendor added " + releaseRate + " tickets. Remaining: " + totalTickets);
+            int actualRelease = Math.min(releaseRate, totalTickets);
+            ticketPool.addTickets(actualRelease);
+            totalTickets -= actualRelease;
+            webSocketController.sendTicketUpdate("Vendor " + vendorId + " added " + actualRelease + " tickets. Remaining for this vendor: " + totalTickets);
+
+            // Update vendor stats in ticketService
+            ticketService.incrementVendorCount(vendorId, actualRelease);
+
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {

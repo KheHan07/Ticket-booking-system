@@ -1,13 +1,15 @@
 package com.TicketingSystem.ticketingsystem.service;
 
+import com.TicketingSystem.ticketingsystem.controller.WebSocketController;
 import com.TicketingSystem.ticketingsystem.dto.TicketConfigDto;
 import com.TicketingSystem.ticketingsystem.dto.StartStopDto;
-import com.TicketingSystem.ticketingsystem.controller.WebSocketController;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @Service
 public class TicketService {
@@ -20,29 +22,44 @@ public class TicketService {
     @Autowired
     private WebSocketController webSocketController;
 
-    // Add fields for the configuration parameters
+    // Configuration parameters
     private int totalTickets;
     private int ticketReleaseRate;
     private int customerRetrievalRate;
+    private int maxTicketCapacity;
+
+    // Stats
+    private int[] vendorTicketCounts; // Tracks tickets released by each vendor
+    private int customersTotalBought = 0;
+    // totalTicketsSoldOut: This is basically customersTotalBought (since sold out = bought)
+    // but we keep a separate variable if needed. Here let's just treat them as the same.
+    // If totalTickets refers to total configured tickets at start, sold out can be min of (customersTotalBought, totalTickets)
+    // For simplicity, totalTicketsSoldOut = customersTotalBought.
+    // They can be the same value.
 
     public void configure(TicketConfigDto configDto) {
-        // Set the configuration values
         this.totalTickets = configDto.getTotalTickets();
         this.ticketReleaseRate = configDto.getTicketReleaseRate();
         this.customerRetrievalRate = configDto.getCustomerRetrievalRate();
-        this.ticketPool = new TicketPool(configDto.getMaxTicketCapacity(), webSocketController);
+        this.maxTicketCapacity = configDto.getMaxTicketCapacity();
 
-        // Default number of vendors and customers
+        this.ticketPool = new TicketPool(maxTicketCapacity, webSocketController);
+
+        // Default vendors and customers count
+        // Will be overridden by setVendorsAndBuyers if called after this.
         vendors = new Vendor[2];
         customers = new Customer[3];
 
-        // Initialize vendors and customers
+        // Initialize vendors and customers with dummy vendor IDs
         for (int i = 0; i < vendors.length; i++) {
-            vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / vendors.length, webSocketController);
+            vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / vendors.length, webSocketController, i+1, this);
         }
         for (int i = 0; i < customers.length; i++) {
-            customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController);
+            customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController, this);
         }
+
+        // Initialize stats arrays
+        vendorTicketCounts = new int[vendors.length];
 
         System.out.println("Configuration completed with: " + configDto);
     }
@@ -52,6 +69,7 @@ public class TicketService {
             return "System is already running";
         }
         running = true;
+
         executorService = Executors.newCachedThreadPool();
 
         // Start vendors and customers
@@ -84,23 +102,81 @@ public class TicketService {
     }
 
     public void setVendorsAndBuyers(StartStopDto dto) {
-        // Set the number of vendors and customers based on the new configuration
         int numberOfVendors = dto.getNumberOfVendors();
         int numberOfCustomers = dto.getNumberOfBuyers();
 
         this.vendors = new Vendor[numberOfVendors];
         this.customers = new Customer[numberOfCustomers];
 
-        // Initialize new vendors
+        // Re-initialize stats arrays
+        vendorTicketCounts = new int[numberOfVendors];
+        customersTotalBought = 0;
+
         for (int i = 0; i < numberOfVendors; i++) {
-            this.vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / numberOfVendors, webSocketController);
+            this.vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / numberOfVendors, webSocketController, i+1, this);
         }
 
-        // Initialize new customers
         for (int i = 0; i < numberOfCustomers; i++) {
-            this.customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController);
+            this.customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController, this);
         }
 
         System.out.println("Number of vendors and buyers set successfully.");
+    }
+
+    public void resetSystem() {
+        // Reset everything
+        stopSystem();
+        this.totalTickets = 150; // can set defaults or leave as is until reconfigure
+        this.ticketReleaseRate = 5;
+        this.customerRetrievalRate = 3;
+        this.maxTicketCapacity = 100;
+
+        this.ticketPool = new TicketPool(maxTicketCapacity, webSocketController);
+        // Default again
+        this.vendors = new Vendor[2];
+        this.customers = new Customer[3];
+
+        for (int i = 0; i < vendors.length; i++) {
+            vendors[i] = new Vendor(ticketPool, ticketReleaseRate, totalTickets / vendors.length, webSocketController, i+1, this);
+        }
+        for (int i = 0; i < customers.length; i++) {
+            customers[i] = new Customer(ticketPool, customerRetrievalRate, webSocketController, this);
+        }
+
+        vendorTicketCounts = new int[vendors.length];
+        customersTotalBought = 0;
+
+        // Not running yet until we call start again
+        System.out.println("System reset successfully.");
+    }
+
+    // Stats update methods
+    public synchronized void incrementVendorCount(int vendorId, int count) {
+        // vendorId starts from 1, array index from 0
+        vendorTicketCounts[vendorId - 1] += count;
+        sendStatsUpdate();
+    }
+
+    public synchronized void incrementCustomerCount(int count) {
+        customersTotalBought += count;
+        sendStatsUpdate();
+    }
+
+    private synchronized void sendStatsUpdate() {
+        // Create JSON for stats
+        JSONObject json = new JSONObject();
+        JSONArray vendorStatsArray = new JSONArray();
+        for (int i = 0; i < vendorTicketCounts.length; i++) {
+            JSONObject v = new JSONObject();
+            v.put("vendorId", i+1);
+            v.put("ticketsReleased", vendorTicketCounts[i]);
+            vendorStatsArray.put(v);
+        }
+        json.put("vendorStats", vendorStatsArray);
+        json.put("customersTotalBought", customersTotalBought);
+        json.put("totalTicketsSoldOut", customersTotalBought);
+
+        // Send JSON string
+        webSocketController.sendStatsUpdate(json.toString());
     }
 }
