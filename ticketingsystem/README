@@ -1,0 +1,111 @@
+Real-Time Event Ticketing System - Spring Boot Backend
+
+    This project is a Real-Time Event Ticketing System designed to manage concurrent ticket releases (by vendors) and
+    purchases (by customers) using the Producer-Consumer pattern. The system handles concurrency, synchronization,
+    and real-time updates using Spring Boot for the backend and Angular for the frontend.
+    The backend is responsible for managing the system's logic, concurrency, and real-time updates, while the frontend
+    (Angular) provides an intuitive user interface.
+
+Technologies Used
+    Backend: Java, Spring Boot, Spring WebSockets, Spring Data JPA, H2 Database, ModelMapper
+    Frontend: Angular (connected to this backend)
+    Concurrency: Multi-threading with Executors and synchronized methods
+    WebSockets: Real-time updates for ticketing activity
+    Database: H2 embedded database for ticket persistence
+    Others: Maven, JSON, File Logging (using FileWriter)
+
+
+File Structure
+TicketingSystem/
+├── src/
+│   ├── main/
+│   │   ├── java/com/TicketingSystem/ticketingsystem/
+│   │   │   ├── config/
+│   │   │   │   └── WebSocketConfig.java
+│   │   │   ├── controller/
+│   │   │   │   ├── TicketController.java
+│   │   │   │   └── WebSocketController.java
+│   │   │   ├── dto/
+│   │   │   │   ├── StartStopDto.java
+│   │   │   │   └── TicketConfigDto.java
+│   │   │   ├── entity/
+│   │   │   │   └── Ticket.java
+│   │   │   ├── repo/
+│   │   │   │   └── TicketRepository.java
+│   │   │   ├── service/
+│   │   │   │   ├── Customer.java
+│   │   │   │   ├── TicketPool.java
+│   │   │   │   ├── TicketService.java
+│   │   │   │   └── Vendor.java
+│   │   │   └── TicketingsystemApplication.java
+│   └── resources/
+│       ├── application.properties
+│       └── static/
+└── README.md
+
+How it Works
+    The system works using the Producer-Consumer Pattern with multiple vendors (producers) and customers (consumers)
+    working concurrently. Key concepts include:
+        Vendors (Producers) add tickets to a shared pool.
+        Customers (Consumers) retrieve tickets from the pool.
+        Ticket Pool maintains the shared resource and ensures thread-safe access with synchronization.
+        Concurrency Management: Vendors and customers run on separate threads, and Spring WebSocket broadcasts real-time updates to the frontend.
+        Configuration: System administrators can configure ticket parameters (like total tickets, ticket release rate, etc.) and dynamically add vendors and buyers.
+        WebSockets: Real-time updates are broadcast to the frontend whenever a ticket is added, removed, or when the system state changes.
+
+
+Class Explanations
+
+1. WebSocketConfig
+    Path: config/WebSocketConfig.java
+    Purpose: Configures WebSocket support for real-time communication.
+    Key Methods:
+        configureMessageBroker: Sets up the message broker for routing messages to /topic.
+        registerStompEndpoints: Defines /ticket-updates endpoint, which allows frontend WebSocket clients to connect.
+
+2. TicketController
+    Path: controller/TicketController.java
+    Purpose: Provides API endpoints to configure, start, stop, and reset the ticketing system.
+    Key Endpoints:
+        /ticket/configure: Configures ticketing system with given parameters.
+        /ticket/start: Starts the ticketing system.
+        /ticket/stop: Stops the system.
+        /ticket/reset: Resets the system to its initial state.
+
+3. WebSocketController
+    Path: controller/WebSocketController.java
+    Purpose: Sends updates to all WebSocket-connected clients.
+    Key Methods:
+        sendTicketUpdate: Broadcasts ticket update messages.
+        sendStatsUpdate: Broadcasts system stats.
+
+4. TicketService
+    Path: service/TicketService.java
+    Purpose: Core logic for the ticketing system (start, stop, configure, reset).
+    Key Methods:
+        configure: Initializes the ticketing system with vendor/customer threads.
+        startSystem: Starts ticket producers and consumers.
+        stopSystem: Stops all threads gracefully.
+        setVendorsAndBuyers: Dynamically adjusts the number of vendors and customers.
+        resetSystem: Resets the system to its initial state.
+
+5. TicketPool
+    Path: service/TicketPool.java
+    Purpose: Shared pool of tickets managed with synchronization to prevent race conditions.
+    Key Methods:
+        addTickets: Adds tickets to the pool (called by vendors).
+        removeTicket: Removes tickets from the pool (called by customers).
+        logToFile: Logs all changes in a log file.
+
+6. Vendor
+    Path: service/Vendor.java
+    Purpose: Producer thread that adds tickets to the pool.
+    Key Methods:
+        run: Executes vendor logic to add tickets at the specified release rate.
+
+7. Customer
+    Path: service/Customer.java
+    Purpose: Consumer thread that retrieves tickets from the pool.
+    Key Methods:
+        run: Executes customer logic to retrieve tickets at the specified rate.
+
