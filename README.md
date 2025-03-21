@@ -1,5 +1,29 @@
-# Ticket-booking-system
-Creating a complete ticket booking system involves developing both the frontend and backend components, as well as integrating an embedded database to store and manage data.
+🎟️ TickSync - Real-Time Event Ticketing System
+Technologies: Spring Boot | Angular | Java | H2 Embedded Database
+
+TickSync is a high-performance real-time ticket booking system built using Spring Boot for the backend and Angular for the frontend. Designed with concurrency and scalability in mind, it handles multiple simultaneous user requests while preventing overbooking through thread-safe operations.
+
+🚀 Key Features
+⚡ Real-time concurrent ticket booking
+🔒 Thread-safe booking to prevent overbooking
+📋 Event and seat management
+🧑‍💼 User-friendly admin & user interfaces
+📊 Live seat availability updates
+🗃️ In-memory database (H2) for fast and lightweight operations
+🌐 RESTful APIs using Spring Boot
+🛠 Tech Stack
+Backend
+Spring Boot
+Java
+H2 Embedded Database
+Spring Data JPA
+Spring Web
+ModelMapper
+Lombok
+Frontend
+Angular (v19.0.1)
+Node.js (v20.18.0)
+npm (v10.8.3)
 ![Screenshot 2025-03-22 022337](https://github.com/user-attachments/assets/e83d592b-74fe-400a-be7d-1a7d82e6e309)
 ![Screenshot 2025-03-22 022346](https://github.com/user-attachments/assets/94b86223-6377-47dc-b7a1-d2abd7027dab)
 ![Screenshot 2025-03-22 022413](https://github.com/user-attachments/assets/3c45e9df-eed5-419a-a60c-d052f3bf8fdb)
